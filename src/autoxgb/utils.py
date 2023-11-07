@@ -27,7 +27,7 @@ def reduce_memory_usage(df, verbose=True):
         if col_type in numerics:
             c_min = df[col].min()
             c_max = df[col].max()
-            if str(col_type)[:3] == "int":
+            if str(col_type).startswith("int"):
                 if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
                     df[col] = df[col].astype(np.int8)
                 elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
@@ -36,13 +36,12 @@ def reduce_memory_usage(df, verbose=True):
                     df[col] = df[col].astype(np.int32)
                 elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
                     df[col] = df[col].astype(np.int64)
+            elif c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
+                df[col] = df[col].astype(np.float16)
+            elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
+                df[col] = df[col].astype(np.float32)
             else:
-                if c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
-                    df[col] = df[col].astype(np.float16)
-                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
-                    df[col] = df[col].astype(np.float32)
-                else:
-                    df[col] = df[col].astype(np.float64)
+                df[col] = df[col].astype(np.float64)
     end_mem = df.memory_usage().sum() / 1024 ** 2
     if verbose:
         logger.info(
@@ -54,10 +53,10 @@ def reduce_memory_usage(df, verbose=True):
 
 
 def dict_mean(dict_list):
-    mean_dict = {}
-    for key in dict_list[0].keys():
-        mean_dict[key] = sum(d[key] for d in dict_list) / len(dict_list)
-    return mean_dict
+    return {
+        key: sum(d[key] for d in dict_list) / len(dict_list)
+        for key in dict_list[0].keys()
+    }
 
 
 def save_valid_predictions(final_valid_predictions, model_config, target_encoder, output_file_name):

@@ -65,8 +65,7 @@ class AutoXGB:
         elif problem_type == ProblemType.single_column_regression:
             y = train_df[self.targets].values
             num_bins = int(np.floor(1 + np.log2(len(train_df))))
-            if num_bins > 10:
-                num_bins = 10
+            num_bins = min(num_bins, 10)
             kf = StratifiedKFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
             train_df["bins"] = pd.cut(train_df[self.targets].values.ravel(), bins=num_bins, labels=False)
             for fold, (_, valid_indicies) in enumerate(kf.split(X=train_df, y=train_df.bins.values)):
@@ -77,7 +76,6 @@ class AutoXGB:
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
             for fold, (_, valid_indicies) in enumerate(kf.split(X=train_df, y=y)):
                 train_df.loc[valid_indicies, "kfold"] = fold
-        # TODO: use iterstrat
         elif problem_type == ProblemType.multi_label_classification:
             y = train_df[self.targets].values
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
@@ -88,25 +86,7 @@ class AutoXGB:
         return train_df
 
     def _determine_problem_type(self, train_df):
-        if self.task is not None:
-            if self.task == "classification":
-                if len(self.targets) == 1:
-                    if len(np.unique(train_df[self.targets].values)) == 2:
-                        problem_type = ProblemType.binary_classification
-                    else:
-                        problem_type = ProblemType.multi_class_classification
-                else:
-                    problem_type = ProblemType.multi_label_classification
-
-            elif self.task == "regression":
-                if len(self.targets) == 1:
-                    problem_type = ProblemType.single_column_regression
-                else:
-                    problem_type = ProblemType.multi_column_regression
-            else:
-                raise Exception("Problem type not understood")
-
-        else:
+        if self.task is None:
             target_type = type_of_target(train_df[self.targets].values)
             # target type is one of the following using scikit-learn's type_of_target
             # * 'continuous': `y` is an array-like of floats that are not all
@@ -137,6 +117,24 @@ class AutoXGB:
                 problem_type = ProblemType.multi_label_classification
             else:
                 raise Exception("Unable to infer `problem_type`. Please provide `classification` or `regression`")
+        elif self.task == "classification":
+            if len(self.targets) == 1:
+                problem_type = (
+                    ProblemType.binary_classification
+                    if len(np.unique(train_df[self.targets].values)) == 2
+                    else ProblemType.multi_class_classification
+                )
+            else:
+                problem_type = ProblemType.multi_label_classification
+
+        elif self.task == "regression":
+            if len(self.targets) == 1:
+                problem_type = ProblemType.single_column_regression
+            else:
+                problem_type = ProblemType.multi_column_regression
+        else:
+            raise Exception("Problem type not understood")
+
         logger.info(f"Problem type: {problem_type.name}")
         return problem_type
 
@@ -183,12 +181,9 @@ class AutoXGB:
             target_encoder = None
 
         if self.categorical_features is None:
-            # find categorical features
-            categorical_features = []
-            for col in self.features:
-                if train_df[col].dtype == "object":
-                    categorical_features.append(col)
-
+            categorical_features = [
+                col for col in self.features if train_df[col].dtype == "object"
+            ]
         else:
             categorical_features = self.categorical_features
 
@@ -215,23 +210,22 @@ class AutoXGB:
                 test_fold.to_feather(os.path.join(self.output, f"test_fold_{fold}.feather"))
 
         # save config
-        model_config = {}
-        model_config["idx"] = self.idx
-        model_config["features"] = self.features
-        model_config["categorical_features"] = categorical_features
-        model_config["train_filename"] = self.train_filename
-        model_config["test_filename"] = self.test_filename
-        model_config["output"] = self.output
-        model_config["problem_type"] = problem_type
-        model_config["idx"] = self.idx
-        model_config["targets"] = self.targets
-        model_config["use_gpu"] = self.use_gpu
-        model_config["num_folds"] = self.num_folds
-        model_config["seed"] = self.seed
-        model_config["num_trials"] = self.num_trials
-        model_config["time_limit"] = self.time_limit
-        model_config["fast"] = self.fast
-
+        model_config = {
+            "features": self.features,
+            "categorical_features": categorical_features,
+            "train_filename": self.train_filename,
+            "test_filename": self.test_filename,
+            "output": self.output,
+            "problem_type": problem_type,
+            "idx": self.idx,
+            "targets": self.targets,
+            "use_gpu": self.use_gpu,
+            "num_folds": self.num_folds,
+            "seed": self.seed,
+            "num_trials": self.num_trials,
+            "time_limit": self.time_limit,
+            "fast": self.fast,
+        }
         self.model_config = ModelConfig(**model_config)
         logger.info(f"Model config: {self.model_config}")
         logger.info("Saving model config")

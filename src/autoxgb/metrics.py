@@ -54,15 +54,15 @@ class Metrics:
                 else:
                     metrics[metric_name] = metric_func(y_true, y_pred[:, 1] >= 0.5)
             elif self.problem_type == ProblemType.multi_class_classification:
-                if metric_name == "accuracy":
-                    metrics[metric_name] = metric_func(y_true, np.argmax(y_pred, axis=1))
-                else:
-                    metrics[metric_name] = metric_func(y_true, y_pred)
+                metrics[metric_name] = (
+                    metric_func(y_true, np.argmax(y_pred, axis=1))
+                    if metric_name == "accuracy"
+                    else metric_func(y_true, y_pred)
+                )
+            elif metric_name == "rmsle":
+                temp_pred = copy.deepcopy(y_pred)
+                temp_pred[temp_pred < 0] = 0
+                metrics[metric_name] = metric_func(y_true, temp_pred)
             else:
-                if metric_name == "rmsle":
-                    temp_pred = copy.deepcopy(y_pred)
-                    temp_pred[temp_pred < 0] = 0
-                    metrics[metric_name] = metric_func(y_true, temp_pred)
-                else:
-                    metrics[metric_name] = metric_func(y_true, y_pred)
+                metrics[metric_name] = metric_func(y_true, y_pred)
         return metrics
