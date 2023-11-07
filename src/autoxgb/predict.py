@@ -65,18 +65,21 @@ class AutoXGBPredict:
             ):
                 test_preds_mll = []
                 for midx in range(len(self.models[fold])):
-                    if self.model_config.problem_type == ProblemType.multi_column_regression:
-                        test_pred_temp = self.models[fold][midx].predict(test_features)
-                    else:
-                        test_pred_temp = self.models[fold][midx].predict_proba(test_features)[:, 1]
+                    test_pred_temp = (
+                        self.models[fold][midx].predict(test_features)
+                        if self.model_config.problem_type
+                        == ProblemType.multi_column_regression
+                        else self.models[fold][midx].predict_proba(test_features)[
+                            :, 1
+                        ]
+                    )
                     test_preds_mll.append(test_pred_temp)
 
                 test_preds = np.column_stack(test_preds_mll)
+            elif self.use_predict_proba:
+                test_preds = self.models[fold].predict_proba(test_features)
             else:
-                if self.use_predict_proba:
-                    test_preds = self.models[fold].predict_proba(test_features)
-                else:
-                    test_preds = self.models[fold].predict(test_features)
+                test_preds = self.models[fold].predict(test_features)
 
             final_preds.append(test_preds)
 

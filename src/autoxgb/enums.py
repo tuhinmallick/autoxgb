@@ -12,7 +12,7 @@ class TaskType(enum.Enum):
         elif task_type == "regression":
             return TaskType.regression
         else:
-            raise ValueError("Invalid task type: {}".format(task_type))
+            raise ValueError(f"Invalid task type: {task_type}")
 
     @staticmethod
     def list_str():
